@@ -1,0 +1,8 @@
+name = show remote images
+description = The module can get remote page by url, and show all images on this page.
+core = 7.x
+dependencies[] = simplehtmldom
+
+version = "7.x-1.0"
+core = "7.x"
+project = "berezanskiy_project"

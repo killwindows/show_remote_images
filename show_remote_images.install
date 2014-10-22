@@ -1,0 +1,23 @@
+<?php
+/**
+ * @file
+ * install and uninstall function for the show_remote_images module
+ */
+
+define("REMOTE_IMAGES_DIR_NAME", '://remote_images');
+
+/**
+ * Implements hook_install
+ */
+function show_remote_images_install() {
+    $directory = file_default_scheme() . REMOTE_IMAGES_DIR_NAME;
+    file_prepare_directory($directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
+}
+
+/**
+ * Implements hook_uninstall
+ */
+function show_remote_images_uninstall() {
+    $directory = file_default_scheme() . REMOTE_IMAGES_DIR_NAME;
+    file_unmanaged_delete_recursive($directory);
+}

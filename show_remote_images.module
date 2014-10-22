@@ -1,0 +1,202 @@
+<?php
+/**
+ * @file
+ */
+
+
+/**
+ * Implements hook_boots
+ */
+function show_remote_images_boot() {
+  define("REMOTE_IMAGES_DIR_NAME", '://remote_images');
+}
+
+/**
+ * Implements hook_permission
+ */
+function show_remote_images_permission() {
+  return array(
+    'show remote images' => array(
+      'title' => t('Show remote images'),
+      'description' => t('Access for use module show_remote_images'),
+    )
+  );
+}
+
+ /**
+  * Implements hook_menu
+  */
+function show_remote_images_menu() {
+  $items['show_remote_images'] = array(
+    'title' => 'Show remote images page',
+    'page callback' => 'show_remote_images_page',
+    'access arguments' => array('show remote images'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements function callback
+ */
+function show_remote_images_page() {
+  $output_images_list = '';
+
+  // create path to directory this module
+  $directory = file_default_scheme() . REMOTE_IMAGES_DIR_NAME;
+  // get files from the directory
+  $files = _get_files($directory);
+
+  // create images and list
+  if (!empty($files)) {
+    $styles = image_styles();
+
+    // if isset image styles, get first and create list item with image style path
+    if (!empty($styles)) {
+      $style = array_shift($styles);
+
+      $item_list = array();
+      foreach ($files as $item) {
+        $item_list[] = theme('image', array('path' => image_style_url($style['name'], $item['path'])));
+      }
+      // creaet images list
+      $output_images_list = theme('item_list', array('items' => $item_list));
+    }
+  }
+
+  // render form
+  $form = drupal_get_form('show_remote_images_page_form');
+
+  return $output_images_list . drupal_render($form);
+}
+
+/**
+ * Implements form
+ */
+function show_remote_images_page_form($form, &$form_state) {
+  $form['remote_page_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Enter here remote page URL. URL format must be with prefix "http://"'),
+    '#default_value' => '',
+    '#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Get images'),
+  );
+
+  return $form;
+}
+
+/**
+ * Implements hook_form_validate
+ */
+function show_remote_images_page_form_validate($form, &$form_state) {
+  if (!empty($form_state['values']['remote_page_url'])) {
+    if (!valid_url($form_state['values']['remote_page_url'], TRUE)) {
+      form_set_error('remote_page_url', t('The incorrect url.'));
+    }
+  }
+}
+
+/**
+ * Implements hook_form_submit
+ */
+function show_remote_images_page_form_submit($form, &$form_state) {
+  // create path to directory this module
+  $directory = file_default_scheme() . REMOTE_IMAGES_DIR_NAME;
+  // clear the directory
+  _clear_directory($directory);
+
+  $images_sources = array();
+
+  if (!empty($form_state['values']['remote_page_url'])) {
+    // get content by url
+    $content = @file_get_contents($form_state['values']['remote_page_url']);
+
+    // get all images from content
+    preg_match_all('/<img[^>]*\/>/isU', $content, $match);
+    if (!empty($match[0])) {
+      // get image source path
+      foreach ($match[0] as $img) {
+        preg_match_all('/src="([^"]*)"/isU', $img, $result);
+        if (!empty($result[1][0])) {
+          $images_sources[] = $result[1][0];
+        }
+      }
+    }
+
+    if (!empty($images_sources)) {
+
+      foreach ($images_sources as $src) {
+        // delete double slash from start string if path format //url...jpg
+        $src = preg_replace('/^(\/+)/is', '', $src);
+
+        // get file extension
+        $extension = pathinfo($src, PATHINFO_EXTENSION);
+        // clear extension if after extension isset other data ..jpg?data=data
+        if ($extension) {
+          preg_match_all('/(^\w+)/is', $extension, $extension_match);
+          if (!empty($extension_match[1][0])) {
+            $extension = $extension_match[1][0];
+          }
+        }
+
+        // create random file name
+        $file_name = md5(time()) . '.' . $extension;
+        // create file path
+        $path_to_file = $directory . '/' . $file_name;
+        // get image origin
+        $image_content = @file_get_contents($src);
+
+        // write image in directory this module
+        if ($image_content && $extension) {
+          $new_file = fopen($path_to_file, 'w');
+          fwrite($new_file, $image_content);
+          fclose($new_file);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Clear directory
+ * @param (string) path to directory
+ */
+function _clear_directory($directory) {
+  $files = scandir($directory);
+
+  if (!empty($files) && is_array($files)) {
+    foreach ($files as $item) {
+      if ($item != '.' && $item != '..') {
+        unlink($directory . '/' . $item);
+      }
+    }
+  }
+}
+
+/**
+ * get all files from directory
+ * @param (string) path to directory
+ * @return (array) list files with 'name' and 'path'
+ */
+function _get_files($directory) {
+  $output = array();
+  $files = scandir($directory);
+
+  if (!empty($files) && is_array($files)) {
+    foreach ($files as $item) {
+      if ($item != '.' && $item != '..') {
+        $output[] = array(
+          'path' => $directory . '/' . $item,
+          'name' => $item
+        );
+      }
+    }
+  }
+
+  return $output;
+}
